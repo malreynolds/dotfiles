@@ -36,6 +36,8 @@ set scrolloff=17
 set sm
 set backspace=2
 set t_Co=256
+" Fix for hanging after falling out of line
+set noeb vb t_vb=
 highlight StatusLine ctermfg=blue ctermbg=yellow
 nmap <F9> 1G=G
 nmap <F2> :NERDTreeToggle<CR>
