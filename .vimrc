@@ -1,7 +1,7 @@
 execute pathogen#infect()
 colorscheme solarized
 set background=dark
-set tw=79
+" set tw=79
 set shell=bash
 set laststatus=2
 set hidden
@@ -134,3 +134,17 @@ nmap     <C-F>p <Plug>CtrlSFPwordPath
 nnoremap <C-F>o :CtrlSFOpen<CR>
 nnoremap <C-F>t :CtrlSFToggle<CR>
 inoremap <C-F>t <Esc>:CtrlSFToggle<CR>
+
+" Make sure Vim returns to the same line when you reopen a file.
+" Thanks, Amit
+augroup line_return
+    au!
+    au BufReadPost *
+        \ if line("'\"") > 0 && line("'\"") <= line("$") |
+        \     execute 'normal! g`"zvzz' |
+        \ endif
+augroup END
+
+
+cnoremap w!! w !sudo tee % >/dev/null
+map Q gq
