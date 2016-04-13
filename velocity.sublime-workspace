@@ -1,0 +1,2365 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"Produ",
+				"ProductGroup	class"
+			],
+			[
+				"Pro",
+				"ProductGroup	class"
+			],
+			[
+				"des",
+				"description_display"
+			],
+			[
+				"jo",
+				"journey_data	statement"
+			],
+			[
+				"distan",
+				"distance_between_poi_and_location	statement"
+			],
+			[
+				"kine",
+				"kinesis_devices"
+			],
+			[
+				"Kinesi",
+				"KinesisDevice	class"
+			],
+			[
+				"parssss",
+				"parser_classes	statement"
+			],
+			[
+				"g",
+				"get_default	function"
+			],
+			[
+				"customer_",
+				"get_test_account_customer_numbers	function"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "velocity/apps/reportsapp/fuels/views.py",
+			"settings":
+			{
+				"buffer_size": 90421,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "velocity/apps/reportsapp/kinesis/privacy/views.py",
+			"settings":
+			{
+				"buffer_size": 14711,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "class CardListView(PermissionAccessViolationMixin, MultiplePermissionsRequiredMixin, ViewAuthenticationMixin, ListView):\n    template_name = 'reportsapp/fuels/card-list.html'\n    paginate_by = 30\n    customer = None\n    hide_stopped_cards = False\n    search_parameters = False\n    permissions = {\n        \"any\": ('users.can_run_reports',)\n    }\n    raise_exception = True\n\n    @method_decorator(login_required)\n    @method_decorator(authenticate_session_customer)\n    @method_decorator(redirect_velos_only_user)\n    def dispatch(self, request, *args, **kwargs):\n        self.customer = request.session.get('customer')\n        self.search_parameters = request.GET.get('search_parameters', None)\n        if self.search_parameters == '' or self.search_parameters == 'Pan No/Embossed details':\n            self.search_parameters = None\n        hide_stopped_cards = request.GET.get('hideStopCards', request.user.wfuserprofile.hide_stopped)\n        self.hide_stopped_cards = True if hide_stopped_cards is True or hide_stopped_cards == 'true' else False\n        return super(CardListView, self).dispatch(request, *args, **kwargs)\n\n    def get_queryset(self):\n        cards = Card.objects.filter(customer__in=self.customers, phantom_card=False).order_by('card_no')\n        can_view_all_cards = self.request.user.has_perm('users.can_view_all_cards')\n\n        if not can_view_all_cards:\n            cards_permitted_to_view = get_objects_for_user(self.request.user, 'cards.can_view_card')\n            cards &= cards_permitted_to_view\n\n        q = Q()\n        if self.hide_stopped_cards:\n            q = Q(stop_flag='N') & Q(expiry_date__gte=date.today())\n\n        if self.search_parameters:\n            q &= Q(pan_no__icontains=self.search_parameters) |\\\n                Q(embossed_line_3__icontains=self.search_parameters) |\\\n                Q(embossed_line_4__icontains=self.search_parameters) |\\\n                Q(embossed_line_5__icontains=self.search_parameters)\n\n        if self.customer.is_multi_brand():\n            return cards.select_related('cardpack_ref').filter(q).order_by('cardpack_ref')\n        return cards.filter(q)\n\n    def get_context_data(self, **kwargs):\n        context = super(CardListView, self).get_context_data(**kwargs)\n        context['all_card_ids'] = json.dumps(self.get_queryset().values_list('pan_no', flat=True), default=json_string)\n        # If this is a multi brand customer create a card pack header attribute on the first card\n        # in each card pack, this allows us to display cards with the appearance they are grouped\n        # into packs.\n        if self.customer.is_multi_brand():\n            card_packs = {}\n            for card in self.get_queryset():\n                card_pack = card.cardpack_ref\n                if not card_pack:\n                    # This card does not belong to a card pack, let's make it look like it does.\n                    # Note we need to add the card pack id as it is used in this particular template for rendering.\n                    cardpack_name = ''\n                    if card.embossed_line_3:\n                        cardpack_name = card.embossed_line_3\n                    elif card.embossed_line_4:\n                        cardpack_name = card.embossed_line_4\n                    elif card.embossed_line_5:\n                        cardpack_name = card.embossed_line_5\n                    elif card.pan_no:\n                        cardpack_name = card.pan_no\n\n                    card_pack = CardPack(cardpack_id=card.pan_no, cardpack_name=cardpack_name)\n                if card_pack in card_packs:\n                    card_packs[card_pack].append(card)\n                else:\n                    card_packs[card_pack] = [card]\n            context.update({'object_list': card_packs})\n        context['hide_stopped_cards'] = self.hide_stopped_cards\n        return context\n\n    def get(self, request, *args, **kwargs):\n        if not request.is_ajax():\n            return HttpResponseRedirect(reverse('velocity_reports'))\n\n        self.customers = request.GET.getlist('customers[]')\n\n        if self.customer.is_multi_brand():\n            self.object_list = self.get_queryset()\n            context = self.get_context_data()\n            return self.render_to_response(context)\n        return super(CardListView, self).get(request, *args, **kwargs)\n        ",
+			"settings":
+			{
+				"buffer_size": 4328,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "velocity/db/users/models.py",
+			"settings":
+			{
+				"buffer_size": 30245,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "class VehicleListView(PermissionAccessViolationMixin, MultiplePermissionsRequiredMixin, ViewAuthenticationMixin, ListView):\n    template_name = 'reportsapp/fuels/vehicle-list.html'\n    paginate_by = 30\n    customer = None\n    hide_stopped_cards = False\n    search_parameters = False\n    permissions = {\n        \"any\": ('users.can_run_reports',)\n    }\n    raise_exception = True\n\n    @method_decorator(login_required)\n    @method_decorator(authenticate_session_customer)\n    @method_decorator(redirect_velos_only_user)\n    def dispatch(self, request, *args, **kwargs):\n        self.customer = request.session.get('customer')\n        self.search_parameters = request.GET.get('search_parameters', None)\n        if self.search_parameters == '' or self.search_parameters == 'Pan No/Embossed details':\n            self.search_parameters = None\n        hide_stopped_cards = request.GET.get('hideStopCards', request.user.wfuserprofile.hide_stopped)\n        self.hide_stopped_cards = True if hide_stopped_cards is True or hide_stopped_cards == 'true' else False\n        return super(VehicleListView, self).dispatch(request, *args, **kwargs)\n\n    def get_queryset(self):\n        cards = Card.objects.filter(customer__in=self.customers, phantom_card=False).order_by('embossed_line_3')\n        can_view_all_cards = self.request.user.has_perm('users.can_view_all_cards')\n\n        if not can_view_all_cards:\n            cards_permitted_to_view = get_objects_for_user(self.request.user, 'cards.can_view_card')\n            cards &= cards_permitted_to_view\n\n        q = Q()\n        if self.hide_stopped_cards:\n            q = Q(stop_flag='N') & Q(expiry_date__gte=date.today())\n\n        if self.search_parameters:\n            q &= Q(pan_no__icontains=self.search_parameters) |\\\n                Q(embossed_line_3__icontains=self.search_parameters) |\\\n                Q(embossed_line_4__icontains=self.search_parameters) |\\\n                Q(embossed_line_5__icontains=self.search_parameters)\n\n        if self.customer.is_multi_brand():\n            return cards.select_related('cardpack_ref').filter(q).order_by('cardpack_ref')\n        return cards.filter(q)\n\n    def get_context_data(self, **kwargs):\n        context = super(VehicleListView, self).get_context_data(**kwargs)\n        context['all_card_ids'] = json.dumps(self.get_queryset().values_list('pan_no', flat=True), default=json_string)\n        # If this is a multi brand customer create a card pack header attribute on the first card\n        # in each card pack, this allows us to display cards with the appearance they are grouped\n        # into packs.\n        if self.customer.is_multi_brand():\n            card_packs = {}\n            for card in self.get_queryset():\n                card_pack = card.cardpack_ref\n                if not card_pack:\n                    # This card does not belong to a card pack, let's make it look like it does.\n                    # Note we need to add the card pack id as it is used in this particular template for rendering.\n                    cardpack_name = ''\n                    if card.embossed_line_3:\n                        cardpack_name = card.embossed_line_3\n                    elif card.embossed_line_4:\n                        cardpack_name = card.embossed_line_4\n                    elif card.embossed_line_5:\n                        cardpack_name = card.embossed_line_5\n                    elif card.pan_no:\n                        cardpack_name = card.pan_no\n\n                    card_pack = CardPack(cardpack_id=card.pan_no, cardpack_name=cardpack_name)\n                if card_pack in card_packs:\n                    card_packs[card_pack].append(card)\n                else:\n                    card_packs[card_pack] = [card]\n            context.update({'object_list': card_packs})\n        context['hide_stopped_cards'] = self.hide_stopped_cards\n        return context\n\n    def get(self, request, *args, **kwargs):\n        if not request.is_ajax():\n            return HttpResponseRedirect(reverse('velocity_reports'))\n\n        self.customers = request.GET.getlist('customers[]')\n\n        if self.customer.is_multi_brand():\n            self.object_list = self.get_queryset()\n            context = self.get_context_data()\n            return self.render_to_response(context)\n        return super(VehicleListView, self).get(request, *args, **kwargs)\n",
+			"settings":
+			{
+				"buffer_size": 4343,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"contents": "Searching 5838 files for \"is_private\"\n\n/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/common.py:\n   60  \n   61  \n   62: def is_private(\n   63:         device_is_private,\n   64          device_rules,\n   65          user_timezone,\n   ..\n   78      device_rules = old_rules | new_rules\n   79  \n   80:     if device_is_private:\n   81          # Does the device have any privacy rules set? If not, then privacy is not enabled.\n   82          if device_rules.count() > 0:\n   ..\n   95  def is_journey_private(\n   96          journey,\n   97:         device_is_private,\n   98          device_rules,\n   99          user_timezone\n  ...\n  103      journey_end_utc = to_datetime(journey['EndDate'], pytz.utc)\n  104  \n  105:     journey_start_is_private = is_private(\n  106:         device_is_private,\n  107          device_rules,\n  108          user_timezone,\n  ...\n  110          journey_start_utc\n  111      )\n  112:     journey_end_is_private = is_private(\n  113:         device_is_private,\n  114          device_rules,\n  115          user_timezone,\n  ...\n  118      )\n  119      # A journey is only considered private if the journey start time and end time are both found to be private.\n  120:     if journey_start_is_private and journey_end_is_private:\n  121          return True\n  122      else:\n  ...\n  126  def is_telem_journey_private(\n  127          journey,\n  128:         device_is_private,\n  129          device_rules,\n  130          user_timezone\n  ...\n  136      journey_end_utc = to_datetime(journey[-1]['time'], pytz.utc)\n  137  \n  138:     journey_start_is_private = is_private(\n  139:         device_is_private,\n  140          device_rules,\n  141          user_timezone,\n  ...\n  143          journey_start_utc\n  144      )\n  145:     journey_end_is_private = is_private(\n  146:         device_is_private,\n  147          device_rules,\n  148          user_timezone,\n  ...\n  151      )\n  152      # A journey is only considered private if the journey start time and end time are both found to be private.\n  153:     if journey_start_is_private and journey_end_is_private:\n  154          return True\n  155      else:\n\n/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/views.py:\n   33  from apps.customersapp.mixins import ReadOnlyCustomerDeniedMixin\n   34  from apps.customersapp.utils import get_cust\n   35: from apps.kinesisapp.common import is_private, convert_to_day_of_week_int, decode_route_points\n   36  from apps.kinesisapp.decorators import authenticate_session_kinesis_customer\n   37  from apps.kinesisapp.forms import KinesisCallBackForm, KinesisUserPreferencesForm, KinesisEditDeviceForm, \\\n   ..\n   92              response_data = response['data']\n   93              for device in self.kinesis_devices:\n   94:                 device_is_private = device.kinesisdeviceprivacyrule_set.all().exists()\n   95                  device_rules = device.kinesisdeviceprivacyrule_set.all()\n   96                  user_timezone = self.request.user.wfuserprofile.get_tz()\n   97                  today = datetime.datetime.now(pytz.utc)\n   98:                 is_currently_private = is_private(\n   99:                     device_is_private,\n  100                      device_rules,\n  101                      user_timezone,\n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/context_common.py:\n  184          total_distance = 0\n  185  \n  186:         device_is_private = bool(self.device.is_private())\n  187          device_rules = self.device.get_privacy_rules()\n  188  \n  ...\n  195              private_journey = is_journey_private(\n  196                  entry,\n  197:                 device_is_private,\n  198                  device_rules,\n  199                  self.timezone\n  ...\n  293              distance,\n  294              service_id,\n  295:             is_private,\n  296              start_date=False,\n  297              end_date=False,\n  ...\n  302          self.end_time = end_time\n  303          self.timezone = timezone\n  304:         self.is_private = is_private\n  305          self.idle_time = idle_time\n  306  \n  ...\n  438          total_drive_time = 0\n  439  \n  440:         device_is_private = bool(self.device.is_private())\n  441          device_rules = self.device.get_privacy_rules()\n  442  \n  ...\n  445              # Skip tow and private journeys - will be removed from their end at some point. This check\n  446              # can be stripped out when that happens.\n  447:             private_journey = is_journey_private(entry, device_is_private, device_rules, self.timezone)\n  448              if entry['JourneyType'] == TOW_JOURNEY or private_journey:\n  449                  continue\n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/context_common.py.orig:\n  184          total_distance = 0\n  185  \n  186:         device_is_private = bool(self.device.is_private())\n  187          device_rules = self.device.get_privacy_rules()\n  188  \n  ...\n  195              private_journey = is_journey_private(\n  196                  entry,\n  197:                 device_is_private,\n  198                  device_rules,\n  199                  self.timezone\n  ...\n  294              distance,\n  295              service_id,\n  296:             is_private,\n  297              start_date=False,\n  298              end_date=False,\n  ...\n  303          self.end_time = end_time\n  304          self.timezone = timezone\n  305:         self.is_private = is_private\n  306          self.idle_time = idle_time\n  307  \n  ...\n  439          total_drive_time = 0\n  440  \n  441:         device_is_private = bool(self.device.is_private())\n  442          device_rules = self.device.get_privacy_rules()\n  443  \n  ...\n  446              # Skip tow and private journeys - will be removed from their end at some point. This check\n  447              # can be stripped out when that happens.\n  448:             private_journey = is_journey_private(entry, device_is_private, device_rules, self.timezone)\n  449              if entry['JourneyType'] == TOW_JOURNEY or private_journey:\n  450                  continue\n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/historical/context.py:\n  110              end_of_last_journey_raw_utc = False\n  111  \n  112:             device_is_private = bool(kinesis_device.is_private())\n  113              device_rules = kinesis_device.get_privacy_rules()\n  114  \n  ...\n  120                  private_journey = is_journey_private(\n  121                      entry,\n  122:                     device_is_private,\n  123                      device_rules,\n  124                      self.timezone\n  ...\n  327              distance,\n  328              service_id,\n  329:             is_private,\n  330              start_date=False,\n  331              end_date=False,\n  ...\n  336          self.end_time = end_time\n  337          self.timezone = timezone\n  338:         self.is_private = is_private\n  339          self.idle_time = idle_time\n  340  \n  ...\n  419  #         total_distance = 0\n  420  #\n  421: #         device_is_private = bool(self.device.is_private())\n  422  #         device_rules = self.device.get_privacy_rules()\n  423  #\n  ...\n  429  #             private_journey = is_journey_private(\n  430  #                 entry,\n  431: #                 device_is_private,\n  432  #                 device_rules,\n  433  #                 self.timezone\n  ...\n  687          total_drive_time = 0\n  688  \n  689:         device_is_private = bool(self.device.is_private())\n  690          device_rules = self.device.get_privacy_rules()\n  691  \n  ...\n  696              private_journey = is_journey_private(\n  697                  entry,\n  698:                 device_is_private,\n  699                  device_rules,\n  700                  self.timezone\n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/historical/views.py:\n  534              self.journey_master_data[str(device.service_id)]['journeys'] = []\n  535  \n  536:             device_is_private = bool(device.is_private())\n  537              device_rules = device.get_privacy_rules()\n  538  \n  ...\n  610                  if not is_telem_journey_private(\n  611                          current_journey,\n  612:                         device_is_private,\n  613                          device_rules,\n  614                          timezone\n  ...\n  644                                      and not is_telem_journey_private(\n  645                                          current_journey,\n  646:                                         device_is_private,\n  647                                          device_rules,\n  648                                          timezone\n  ...\n  681                      if not is_telem_journey_private(\n  682                              current_journey,\n  683:                             device_is_private,\n  684                              device_rules,\n  685                              timezone\n  ...\n 1016              u'distance': journey.distance,\n 1017              u'service_id': int(journey.service_id),\n 1018:             u'is_private': journey.is_private,\n 1019          }\n 1020  \n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/privacy/views.py:\n  208                      'vehicle_registration': device.vehicle_registration,\n  209                      'driver_name': device.driver_name,\n  210:                     'privacy_enabled': device.is_private()\n  211                  }\n  212  \n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/scores/context.py:\n    5  from django.utils.translation import ugettext_lazy as _\n    6  \n    7: from apps.kinesisapp.common import is_private, convert_to_day_of_week_int\n    8  from apps.kinesisapp.services.handlers.kinesis_handler import ScorePeriod\n    9  from apps.reportsapp.kinesis.context_common import get_closest_poi\n   ..\n  371          self.event_telem_data = event_telem_data\n  372          self.first_event_for_device = first_event_for_device\n  373:         self.is_private = private\n  374          self.datetime_ = to_datetime(self.event_telem_data['gpsTime'], timezone)\n  375          self.timezone = timezone\n  ...\n  394  \n  395      def privatise(self):\n  396:         if self.is_private:\n  397              self.location = unicode(_('Privacy'))\n  398              self.lat = 0.0\n  ...\n  543              'event_type_text': event.event_type_text,\n  544              'first_event_for_device': event.first_event_for_device,\n  545:             'is_private': event.is_private,\n  546              'lat': event.lat,\n  547              'location': event.location,\n  ...\n  582  \n  583      for kinesis_device in device_queryset:\n  584:         device_is_private = bool(kinesis_device.is_private())\n  585          device_rules = kinesis_device.get_privacy_rules()\n  586          user_timezone = date_range.timezone\n  ...\n  600                  event_datetime = to_datetime(telem_point['gpsTime'], user_timezone)\n  601  \n  602:                 event_is_private = is_private(\n  603:                     device_is_private,\n  604                      device_rules,\n  605                      user_timezone,\n  ...\n  632                      first_event_for_device,\n  633                      speed_conversion_factor,\n  634:                     event_is_private\n  635                  )\n  636  \n\n/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/scores/events-table.html:\n  146                      <td class=\"event_type_text\">{{ event.event_type_text }}</td>\n  147  \n  148:                     <td class=\"{% if not event.is_private %}clickable{% else %}{% endif %} show_single_event_data_cell noprint text-center\">\n  149                          <input type=\"hidden\" class=\"single_event_lat\" value=\"{{ event.lat }}\">\n  150                          <input type=\"hidden\" class=\"single_event_lon\" value=\"{{ event.lon }}\">\n  151                          <input type=\"hidden\" class=\"device_service_id\" value=\"{{ event.service_id }}\">\n  152                          <input type=\"hidden\" class=\"device_header\" value=\"{{ event.device_header }}\">\n  153:                         <img style=\"width: 25px; height:25px;\" class=\"show_event\" src=\"{% if not event.is_private %}{% static \"kinesisapp/images/kinesis-play-red.png\" %}{% else %}{% static \"kinesisapp/images/red_padlock.png\" %}{% endif %}{{ release_version }}\">\n  154                      </td>\n  155                      {% if selected_event_type == OVERSPEEDING_EVENT %}\n\n/home/atanas/workspace/webfuels/velocity/common/excel_writer.py:\n  362                                      if value['data'] == 'start_address' or value['data'] == 'end_address':\n  363                                          # Set the locations to be marked as private where appropriate.\n  364:                                         if journey.is_private:\n  365                                              current_field = unicode(_('Privacy'))\n  366                                  except:\n  ...\n  510                                      if value['data'] == 'start_address' or value['data'] == 'end_address':\n  511                                          # Set the locations to be marked as private where appropriate.\n  512:                                         if journey.is_private:\n  513                                              current_field = unicode(_('Privacy'))\n  514                                  except:\n\n/home/atanas/workspace/webfuels/velocity/db/kinesis/models.py:\n  179                  rule.delete()\n  180  \n  181:     def is_private(self):\n  182          if KinesisDevicePrivacyRule.objects.filter(device=self).exists():\n  183              return True\n\n79 matches across 11 files\n",
+			"settings":
+			{
+				"buffer_size": 13648,
+				"line_ending": "Unix",
+				"name": "Find Results",
+				"scratch": true
+			}
+		},
+		{
+			"file": "velocity/db/cards/managers.py",
+			"settings":
+			{
+				"buffer_size": 9518,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "velocity/db/locations/models.py",
+			"settings":
+			{
+				"buffer_size": 9772,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "velocity/db/locations/managers.py",
+			"settings":
+			{
+				"buffer_size": 2748,
+				"line_ending": "Unix"
+			}
+		}
+	],
+	"build_system": "Anaconda Python Builder",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Anaconda Python Builder",
+					""
+				],
+				[
+					"Packages/Python/Python.sublime-build",
+					""
+				],
+				[
+					"Packages/Python/Python.sublime-build",
+					"Syntax Check"
+				]
+			],
+			[
+				"Anaconda Python Builder",
+				""
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 174.0,
+		"last_filter": "Package Control: rem",
+		"selected_items":
+		[
+			[
+				"Package Control: rem",
+				"Package Control: Remove Package"
+			],
+			[
+				"pi",
+				"Package Control: Install Package"
+			],
+			[
+				"ss n",
+				"Set Syntax: nginx"
+			],
+			[
+				"ss nginx",
+				"Set Syntax: nginx"
+			],
+			[
+				"ssngin",
+				"Set Syntax: nginx"
+			],
+			[
+				"package remove",
+				"Package Control: Remove Package"
+			],
+			[
+				"Goto",
+				"Ycmd: GoTo Definition"
+			],
+			[
+				"GoTo",
+				"Ycmd: GoTo Definition"
+			],
+			[
+				":w",
+				":w - Save"
+			],
+			[
+				"premove",
+				"Package Control: Remove Package"
+			],
+			[
+				"premove ",
+				"Package Control: Remove Package"
+			],
+			[
+				"mini",
+				"View: Toggle Minimap"
+			],
+			[
+				"PI",
+				"Package Control: Install Package"
+			],
+			[
+				"destro",
+				"Origami: Destroy Current Pane"
+			],
+			[
+				"oria",
+				"Origami: Destroy Pane Above"
+			],
+			[
+				"minimap",
+				"View: Toggle Minimap"
+			],
+			[
+				"origami",
+				"Origami: Create Pane Above"
+			],
+			[
+				"projec",
+				"Project: Add Folder"
+			],
+			[
+				"toggle sid",
+				"View: Toggle Open Files in Side Bar"
+			],
+			[
+				"pi ",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 575.0
+	},
+	"console":
+	{
+		"height": 139.0,
+		"history":
+		[
+			"import urllib.request,os,hashlib; h = '2915d1851351e5ee549c20394736b442' + '8bc59f460fa1548d1514676163dafc88'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://packagecontrol.io/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/atanas/workspace/webfuels",
+		"/home/atanas/workspace/webfuels/velocity",
+		"/home/atanas/workspace/webfuels/velocity/apps"
+	],
+	"file_history":
+	[
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/common.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/common.py",
+		"/home/atanas/.config/sublime-text-3/Packages/User/Anaconda.sublime-settings",
+		"/home/atanas/.config/sublime-text-3/Packages/User/Default (Linux).sublime-keymap",
+		"/home/atanas/.config/sublime-text-3/Packages/User/Preferences.sublime-settings",
+		"/home/atanas/workspace/webfuels/velocity/apps/webservicesapp/service.py",
+		"/home/atanas/workspace/webfuels/velocity/db/locations/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/db/cardgroups/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/db/cards/models.py",
+		"/home/atanas/workspace/webfuels/velocity/db/users/models.py",
+		"/home/atanas/workspace/webfuels/velocity/db/transactions/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/decorators.py",
+		"/home/atanas/workspace/webfuels/velocity/db/locations/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/velos/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/custservicesapp/views.py",
+		"/home/atanas/moon.txt",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/customers.html",
+		"/home/atanas/workspace/webfuels/velocity/db/transactions/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/timesheets/context.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/services.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/context_common.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/tests/test_app.py",
+		"/home/atanas/workspace/webfuels/velocity/dashboard.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/fuels/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/cards/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/historical/context.py",
+		"/home/atanas/workspace/webfuels/velocity/common/excel_writer.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/timesheets/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/historical/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/tasks.py",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static/newdesign/stylesheets/webfuels_style.css",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/tests/app/kinesis/matrixapi.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardgroupsapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/velos/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/reports.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/settings.py",
+		"/home/atanas/workspace/webfuels/velocity/velocity/localsettings.py",
+		"/home/atanas/workspace/webfuels/velocity/db/reports/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/saved-report-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/api/mobile/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/kinesis/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/velocitydashboardapp/urls.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/velocitydashboardapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/velocitydashboardapp/templates/velocitydashboardapp/integrated.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/economy/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/transactionsapp/api/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/kinesis/managers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/card-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/vehicle-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/fuels/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/customersapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/notificationsapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/velos/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/velos/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/fuels/views.py",
+		"/home/atanas/workspace/design/reports.txt",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/api/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/transactionsapp/fuels/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/velos/models.py",
+		"/home/atanas/workspace/webfuels/velocity/db/invoices/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/card-list.html",
+		"/home/atanas/workspace/webfuels/velocity/db/users/migrations/0004_auto_20150402_1348.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/country-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/country-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/customer-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/customer-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/product-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/card-type-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/fuels/urls.py",
+		"/home/atanas/workspace/webfuels/velocity/db/reports/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/velosapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/locationsapp/api/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/velos/card-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/usersapp/views.py",
+		"/home/atanas/workspace/webfuels/velocity/db/tracking/models.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/templates/cardsapp/velos/card_list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/apiapp/urls.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/apiapp/views.py",
+		"/home/atanas/.virtualenvs/velocity-env/local/lib/python2.7/site-packages/guardian/shortcuts.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/api/views.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/api/serializers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/apiapp/serializers.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/alertsapp/templates/alertsapp/kinesis/results-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/commonapp/views/generic/tables.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/velos/date-selection-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/usersapp/templates/usersapp/admin/administer_users.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/templates/invoicesapp/fuels/summary.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/templates/invoicesapp/velos/summary.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/templates/invoicesapp/fuels/index.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/templates/cardsapp/fuels/card_navigation.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/invoicesapp/templates/invoicesapp/velos/index.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/date-selection-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/velos/saved-report-list.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static_global/newdesign/stylesheets/menu_styles.css",
+		"/home/atanas/workspace/webfuels/velocity/velocity/nginx/sites/velocityfleet",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/templates/cardsapp/velos/card_navigation.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/service_settings.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/usersapp/forms.py",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/saved-report-list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/kinesis/urls.py",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static/newdesign/js/stepPanels.js",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/historical/reports.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/service-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static/newdesign/stylesheets/app2.css",
+		"/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/templates/kinesisapp/saved-report-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/templates/403.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/nginx/sites/velocitycardmanagement",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static_global/newdesign/stylesheets/custservices/ordercards.css",
+		"/home/atanas/workspace/webfuels/velocity/apps/custservicesapp/templates/custservicesapp/orderCards.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/kinesisapp/templates/kinesisapp/points-of-interest-list.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static_global/newdesign/stylesheets/app2.css",
+		"/home/atanas/workspace/webfuels/velocity/apps/velosapp/templates/velosapp/security_validation.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/economy/economy-results-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/fuels/card-group-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/velos/card-group-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/historical/individual-journeys-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/usersapp/templates/usersapp/admin/manage_user_form_base.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/templates/cardsapp/fuels/card_list.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/mileage_breakdown/reports.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templates/reportsapp/kinesis/date-selection-panel.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/alertsapp/templates/alertsapp/kinesis/base-alert.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/cardsapp/templates/cardsapp/fuels/card_list_table.html",
+		"/home/atanas/workspace/webfuels/velocity/velocity/static/newdesign/invoices.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/custservicesapp/templates/custservicesapp/admin/list_users.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/alertsapp/templates/alertsapp/kinesis/saved_alerts/saved_alerts_table.html",
+		"/home/atanas/workspace/webfuels/velocity/apps/reportsapp/templatetags/reports.py"
+	],
+	"find":
+	{
+		"height": 70.0
+	},
+	"find_in_files":
+	{
+		"height": 158.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"is_private",
+			"mixins",
+			"device_is_private",
+			"new_rules",
+			"Transaction",
+			"CountryMana",
+			"customers",
+			"wfuserprofile.get_hierarchy_queryset_for_customer",
+			"cards_permitted",
+			"customers[]",
+			"reports",
+			"customers",
+			"customers[]",
+			"html",
+			"customers",
+			"Country",
+			"manager",
+			"Country ",
+			"Foreign",
+			"get_customer(",
+			"get_customer",
+			"customers",
+			"card_queryset = Card.objects",
+			"get_objects_for_user",
+			"Transaction",
+			"Transaction.",
+			"Transaction",
+			"import Transaction",
+			"importTransaction",
+			"Transaction.",
+			"Transaction",
+			"import",
+			"get_objects_for_user",
+			"Product.obje",
+			"ProductManager",
+			"fuels(",
+			"get_assigned",
+			"ProductGroup",
+			"ProductListView",
+			"12 hours",
+			"self.customers",
+			"WFUserProfileCustomers",
+			"customers",
+			"get_all_customers",
+			"wfuser",
+			"customers(",
+			"customers()",
+			"customers",
+			"db.customers.models",
+			"db.customers",
+			"customers",
+			"class User",
+			"WFUserProfile",
+			"username =",
+			"username",
+			"email =",
+			"email",
+			"User",
+			"User.ob",
+			"Users",
+			"12 hours",
+			"DayGr",
+			"Day",
+			"Date",
+			"startDate",
+			"device_journey_data",
+			"IndividualJourneyProcessor",
+			"IndividualJourneyProces",
+			"entry",
+			"Journey(",
+			"end_date_short",
+			"print",
+			"service_id_groups",
+			"service_id_group",
+			"ExtendedJourney",
+			"extended_journey_webservice",
+			"ExtendedJourney",
+			"extended_journey_webservice",
+			"Extended",
+			"ExtendedJourneyService",
+			"journey_data",
+			"start",
+			"working_time",
+			"get_journey_history_individual",
+			"journey_history",
+			"EndDate",
+			"self.start",
+			"StartDate",
+			"StartDate=",
+			"StartDate",
+			"driving_hours",
+			"DriverTimeshee",
+			"stopped_time",
+			"working_time",
+			"ExcelWriter",
+			"kinesi",
+			"StartDate",
+			"entry['StartDate']",
+			"entry['",
+			"relevant_journeys",
+			"IndividualJour",
+			"start_of_first",
+			"working_time",
+			"manager",
+			"end_of_last_journey",
+			"entry['st",
+			"entry['",
+			"time_style",
+			"IndividualJ",
+			"Individual",
+			"create_excel_download",
+			"context_create_timesheet",
+			"KinesisDriverTi",
+			"ExcelWriter",
+			"DriverTimeshe",
+			"apps.api.",
+			"{% static \"Buttons-1.0.3/css/buttons.foundation.min.css\" %}",
+			"report_configuration.date_start = date.today() - relativedelta(years=1)",
+			"ProductManager",
+			"models.query.QuerySet",
+			"ProductGroup",
+			"filter_for_customer",
+			"get_assigned_cards",
+			"get_assigned",
+			"as_manager",
+			"ReportView",
+			"JsonResponse",
+			"is_private"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 0,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "velocity/apps/reportsapp/fuels/views.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 90421,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								77728,
+								77728
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 27024.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "velocity/apps/reportsapp/kinesis/privacy/views.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 14711,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								943,
+								943
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 4328,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2769,
+								2769
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"default_dir": "/home/atanas/workspace/webfuels",
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 571.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "velocity/db/users/models.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 30245,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1433,
+								1433
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"history_list_is_closing": true,
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 288.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 8,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"selected": 1,
+			"sheets":
+			[
+				{
+					"buffer": 4,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 4343,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								3866,
+								3866
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"default_dir": "/home/atanas/workspace/webfuels",
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 912.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 13648,
+						"regions":
+						{
+							"match":
+							{
+								"flags": 112,
+								"regions":
+								[
+									[
+										134,
+										144
+									],
+									[
+										168,
+										178
+									],
+									[
+										322,
+										332
+									],
+									[
+										559,
+										569
+									],
+									[
+										739,
+										749
+									],
+									[
+										752,
+										762
+									],
+									[
+										786,
+										796
+									],
+									[
+										932,
+										942
+									],
+									[
+										945,
+										955
+									],
+									[
+										979,
+										989
+									],
+									[
+										1216,
+										1226
+									],
+									[
+										1243,
+										1253
+									],
+									[
+										1388,
+										1398
+									],
+									[
+										1569,
+										1579
+									],
+									[
+										1582,
+										1592
+									],
+									[
+										1616,
+										1626
+									],
+									[
+										1762,
+										1772
+									],
+									[
+										1775,
+										1785
+									],
+									[
+										1809,
+										1819
+									],
+									[
+										2046,
+										2056
+									],
+									[
+										2073,
+										2083
+									],
+									[
+										2363,
+										2373
+									],
+									[
+										2765,
+										2775
+									],
+									[
+										3098,
+										3108
+									],
+									[
+										3144,
+										3154
+									],
+									[
+										3388,
+										3398
+									],
+									[
+										3418,
+										3428
+									],
+									[
+										3625,
+										3635
+									],
+									[
+										3796,
+										3806
+									],
+									[
+										3986,
+										3996
+									],
+									[
+										3999,
+										4009
+									],
+									[
+										4132,
+										4142
+									],
+									[
+										4162,
+										4172
+									],
+									[
+										4492,
+										4502
+									],
+									[
+										4797,
+										4807
+									],
+									[
+										4827,
+										4837
+									],
+									[
+										5034,
+										5044
+									],
+									[
+										5205,
+										5215
+									],
+									[
+										5395,
+										5405
+									],
+									[
+										5408,
+										5418
+									],
+									[
+										5541,
+										5551
+									],
+									[
+										5571,
+										5581
+									],
+									[
+										5901,
+										5911
+									],
+									[
+										6230,
+										6240
+									],
+									[
+										6263,
+										6273
+									],
+									[
+										6489,
+										6499
+									],
+									[
+										6668,
+										6678
+									],
+									[
+										6858,
+										6868
+									],
+									[
+										6871,
+										6881
+									],
+									[
+										7007,
+										7017
+									],
+									[
+										7037,
+										7047
+									],
+									[
+										7253,
+										7263
+									],
+									[
+										7415,
+										7425
+									],
+									[
+										7445,
+										7455
+									],
+									[
+										7652,
+										7662
+									],
+									[
+										7944,
+										7954
+									],
+									[
+										7969,
+										7979
+									],
+									[
+										8200,
+										8210
+									],
+									[
+										8498,
+										8508
+									],
+									[
+										8787,
+										8797
+									],
+									[
+										9028,
+										9038
+									],
+									[
+										9049,
+										9059
+									],
+									[
+										9365,
+										9375
+									],
+									[
+										9609,
+										9619
+									],
+									[
+										9953,
+										9963
+									],
+									[
+										10171,
+										10181
+									],
+									[
+										10436,
+										10446
+									],
+									[
+										10455,
+										10465
+									],
+									[
+										10637,
+										10647
+									],
+									[
+										10670,
+										10680
+									],
+									[
+										10934,
+										10944
+									],
+									[
+										10947,
+										10957
+									],
+									[
+										10993,
+										11003
+									],
+									[
+										11230,
+										11240
+									],
+									[
+										11537,
+										11547
+									],
+									[
+										12164,
+										12174
+									],
+									[
+										12782,
+										12792
+									],
+									[
+										13218,
+										13228
+									],
+									[
+										13490,
+										13500
+									]
+								],
+								"scope": ""
+							}
+						},
+						"selection":
+						[
+							[
+								908,
+								908
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"default_dir": "/home/atanas/workspace/webfuels",
+							"detect_indentation": false,
+							"line_numbers": false,
+							"output_tag": 1,
+							"result_base_dir": "",
+							"result_file_regex": "^([A-Za-z\\\\/<].*):$",
+							"result_line_regex": "^ +([0-9]+):",
+							"scroll_past_end": true,
+							"syntax": "Packages/Default/Find Results.hidden-tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 272.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 6,
+					"file": "velocity/db/cards/managers.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 9518,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								7908,
+								7908
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 1225.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 7,
+					"type": "text"
+				},
+				{
+					"buffer": 7,
+					"file": "velocity/db/locations/models.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 9772,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								5520,
+								5520
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 6051.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 6,
+					"type": "text"
+				},
+				{
+					"buffer": 8,
+					"file": "velocity/db/locations/managers.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2748,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								691,
+								691
+							]
+						],
+						"settings":
+						{
+							"BracketHighlighterBusy": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html"
+								},
+								{
+									"characters": ".#",
+									"selector": "text.html"
+								}
+							],
+							"bh_regions":
+							[
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
+							],
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 70.0
+	},
+	"input":
+	{
+		"height": 65.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			],
+			[
+				1,
+				0,
+				2,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			0.689375,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.CSS Extended Completions":
+	{
+		"height": 0.0
+	},
+	"output.exec":
+	{
+		"height": 132.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "velocity.sublime-project",
+	"replace":
+	{
+		"height": 114.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"reportsappviews",
+				"velocity/apps/reportsapp/fuels/views.py"
+			],
+			[
+				"privacyviews",
+				"velocity/apps/reportsapp/kinesis/privacy/views.py"
+			],
+			[
+				"locationsmana",
+				"velocity/db/locations/managers.py"
+			],
+			[
+				"locationsmodels",
+				"velocity/db/locations/models.py"
+			],
+			[
+				"custservicesappviews",
+				"velocity/apps/custservicesapp/views.py"
+			],
+			[
+				"customershtml",
+				"velocity/apps/reportsapp/templates/reportsapp/customers.html"
+			],
+			[
+				"locationmanagers",
+				"velocity/db/locations/managers.py"
+			],
+			[
+				"transactionmanagers",
+				"velocity/db/transactions/managers.py"
+			],
+			[
+				"usermodels",
+				"velocity/db/users/models.py"
+			],
+			[
+				"cardgroupmanagers",
+				"velocity/db/cardgroups/managers.py"
+			],
+			[
+				"transactionmodels",
+				"velocity/db/transactions/models.py"
+			],
+			[
+				"cardmodels",
+				"velocity/db/cards/models.py"
+			],
+			[
+				"cardmanagers",
+				"velocity/db/cards/managers.py"
+			],
+			[
+				"cardsmanagers",
+				"velocity/db/cards/managers.py"
+			],
+			[
+				"service.py",
+				"velocity/apps/webservicesapp/service.py"
+			],
+			[
+				"reportsviews",
+				"velocity/apps/reportsapp/velos/views.py"
+			],
+			[
+				"usersmodels",
+				"velocity/db/users/models.py"
+			],
+			[
+				"webfuels_style",
+				"velocity/velocity/static/newdesign/stylesheets/webfuels_style.css"
+			],
+			[
+				"kinesisservices",
+				"velocity/apps/reportsapp/kinesis/services.py"
+			],
+			[
+				"historicalcontex",
+				"velocity/apps/reportsapp/kinesis/historical/context.py"
+			],
+			[
+				"excel_w",
+				"velocity/common/excel_writer.py"
+			],
+			[
+				"context_co",
+				"velocity/apps/reportsapp/kinesis/context_common.py"
+			],
+			[
+				"context_common",
+				"velocity/apps/reportsapp/kinesis/context_common.py"
+			],
+			[
+				"context_",
+				"velocity/apps/reportsapp/kinesis/context_common.py"
+			],
+			[
+				"context_comm",
+				"velocity/apps/reportsapp/kinesis/context_common.py"
+			],
+			[
+				"settings.py",
+				"velocity/velocity/settings.py"
+			],
+			[
+				"transactionmanage",
+				"velocity/db/transactions/managers.py"
+			],
+			[
+				"kinesisviews",
+				"velocity/apps/kinesisapp/views.py"
+			],
+			[
+				"common.py",
+				"velocity/apps/kinesisapp/common.py"
+			],
+			[
+				"integrated.",
+				"velocity/apps/velocitydashboardapp/templates/velocitydashboardapp/integrated.html"
+			],
+			[
+				"dashboardviews",
+				"velocity/apps/velocitydashboardapp/views.py"
+			],
+			[
+				"kinesismodels",
+				"velocity/db/kinesis/models.py"
+			],
+			[
+				"transactionmodl",
+				"velocity/db/transactions/models.py"
+			],
+			[
+				"transactionmana",
+				"velocity/db/transactions/managers.py"
+			],
+			[
+				"saved-report-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/saved-report-list.html"
+			],
+			[
+				"reviews.py",
+				"velocity/apps/reportsapp/economy/views.py"
+			],
+			[
+				"views.py",
+				"velocity/apps/velocitydashboardapp/views.py"
+			],
+			[
+				"vehicle-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/vehicle-list.html"
+			],
+			[
+				"reportsappvelos",
+				"velocity/apps/reportsapp/velos/views.py"
+			],
+			[
+				"reportsappkinesisviews",
+				"velocity/apps/reportsapp/kinesis/views.py"
+			],
+			[
+				"reportsapp",
+				"velocity/apps/reportsapp/fuels/views.py"
+			],
+			[
+				"cardgroupsviews",
+				"velocity/apps/cardgroupsapp/views.py"
+			],
+			[
+				"cardsapp/views",
+				"velocity/apps/cardsapp/velos/views.py"
+			],
+			[
+				"invoicesappviews",
+				"velocity/apps/invoicesapp/velos/views.py"
+			],
+			[
+				"invoicesviews",
+				"velocity/apps/invoicesapp/fuels/views.py"
+			],
+			[
+				"cardgroupsappviews",
+				"velocity/apps/cardgroupsapp/views.py"
+			],
+			[
+				"reportsappeconomyviews",
+				"velocity/apps/reportsapp/economy/views.py"
+			],
+			[
+				"cardsappvi",
+				"velocity/apps/cardsapp/fuels/views.py"
+			],
+			[
+				"cardsappviews",
+				"velocity/apps/cardsapp/velos/views.py"
+			],
+			[
+				"invoices/",
+				"velocity/db/invoices/models.py"
+			],
+			[
+				"cardgroupmanage",
+				"velocity/db/cardgroups/managers.py"
+			],
+			[
+				"dbvelosmanager",
+				"velocity/db/velos/managers.py"
+			],
+			[
+				"db/velos/models",
+				"velocity/db/velos/models.py"
+			],
+			[
+				"manager.py",
+				"velocity/db/cardgroups/managers.py"
+			],
+			[
+				"cardgroupmanager",
+				"velocity/db/cardgroups/managers.py"
+			],
+			[
+				"card-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/card-list.html"
+			],
+			[
+				"country-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/country-list.html"
+			],
+			[
+				"customer-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/customer-list.html"
+			],
+			[
+				"countrylist",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/country-list.html"
+			],
+			[
+				"country-panel",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/country-panel.html"
+			],
+			[
+				"product-list",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/product-list.html"
+			],
+			[
+				"customer-panel",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/customer-panel.html"
+			],
+			[
+				"card-typelist",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/card-type-list.html"
+			],
+			[
+				"reportsmanagers",
+				"velocity/db/reports/managers.py"
+			],
+			[
+				"velosviews",
+				"velocity/apps/velosapp/views.py"
+			],
+			[
+				"veloscard-list",
+				"velocity/apps/reportsapp/templates/reportsapp/velos/card-list.html"
+			],
+			[
+				"veloscardlist",
+				"velocity/apps/cardsapp/templates/cardsapp/velos/card_list.html"
+			],
+			[
+				"reportsvelosviews",
+				"velocity/apps/reportsapp/velos/views.py"
+			],
+			[
+				"countr",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/country-list.html"
+			],
+			[
+				"appsapiappviews",
+				"velocity/apps/apiapp/views.py"
+			],
+			[
+				"app2",
+				"velocity/velocity/static/newdesign/stylesheets/app2.css"
+			],
+			[
+				"reportsreports",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/reports.html"
+			],
+			[
+				"reportssavedreports",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/saved-report-list.html"
+			],
+			[
+				"invoicesappapiviews",
+				"velocity/apps/invoicesapp/api/views.py"
+			],
+			[
+				"403",
+				"velocity/velocity/templates/403.html"
+			],
+			[
+				"localse",
+				"velocity/velocity/localsettings.py"
+			],
+			[
+				"cardsappapiviews",
+				"velocity/apps/cardsapp/api/views.py"
+			],
+			[
+				"serializers",
+				"velocity/apps/cardsapp/api/serializers.py"
+			],
+			[
+				"serializ",
+				"velocity/apps/apiapp/serializers.py"
+			],
+			[
+				"service_sett",
+				"velocity/velocity/service_settings.py"
+			],
+			[
+				"services",
+				"velocity/apps/reportsapp/kinesis/services.py"
+			],
+			[
+				"veloci",
+				"velocity/velocity/nginx/sites/velocitycardmanagement"
+			],
+			[
+				"nginxsites",
+				"velocity/velocity/nginx/sites/velocityfleet"
+			],
+			[
+				"cardna",
+				"velocity/apps/cardsapp/templates/cardsapp/fuels/card_navigation.html"
+			],
+			[
+				"menu_styles",
+				"velocity/velocity/static_global/newdesign/stylesheets/menu_styles.css"
+			],
+			[
+				"cardnavi",
+				"velocity/apps/cardsapp/templates/cardsapp/fuels/card_navigation.html"
+			],
+			[
+				"menu_",
+				"velocity/velocity/static_global/newdesign/stylesheets/menu_styles.css"
+			],
+			[
+				"veloscardnav",
+				"velocity/apps/cardsapp/templates/cardsapp/velos/card_navigation.html"
+			],
+			[
+				"dateselec",
+				"velocity/apps/reportsapp/templates/reportsapp/velos/date-selection-panel.html"
+			],
+			[
+				"datesele",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/date-selection-panel.html"
+			],
+			[
+				"poi",
+				"velocity/apps/kinesisapp/templates/kinesisapp/points-of-interest-list.html"
+			],
+			[
+				"date-sel",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/date-selection-panel.html"
+			],
+			[
+				"date-selec",
+				"velocity/apps/reportsapp/templates/reportsapp/velos/date-selection-panel.html"
+			],
+			[
+				"date-selectio",
+				"velocity/apps/reportsapp/templates/reportsapp/kinesis/date-selection-panel.html"
+			],
+			[
+				"economy-resu",
+				"velocity/apps/reportsapp/templates/reportsapp/economy/economy-results-panel.html"
+			],
+			[
+				"pointsof",
+				"velocity/apps/kinesisapp/templates/kinesisapp/points-of-interest-list.html"
+			],
+			[
+				"cardlisthtml",
+				"velocity/apps/cardsapp/templates/cardsapp/fuels/card_list.html"
+			],
+			[
+				"menustyles",
+				"velocity/velocity/static_global/newdesign/stylesheets/menu_styles.css"
+			],
+			[
+				"reportsappreportshtml",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/reports.html"
+			],
+			[
+				"cardlisttable",
+				"velocity/apps/cardsapp/templates/cardsapp/fuels/card_list_table.html"
+			],
+			[
+				"app2s",
+				"velocity/velocity/static_global/newdesign/stylesheets/app2.css"
+			],
+			[
+				"invoiceshtml",
+				"velocity/velocity/static/newdesign/invoices.html"
+			],
+			[
+				"manageusershtml",
+				"velocity/apps/usersapp/templates/usersapp/admin/manage_user_form_base.html"
+			],
+			[
+				"kinesisemailbutton",
+				"velocity/apps/reportsapp/templates/reportsapp/kinesis/email/email-buttons.html"
+			],
+			[
+				"individual",
+				"velocity/apps/reportsapp/templates/reportsapp/kinesis/historical/individual-journeys-panel.html"
+			],
+			[
+				"poihtml",
+				"velocity/apps/kinesisapp/templates/kinesisapp/points-of-interest-list.html"
+			],
+			[
+				"localset",
+				"velocity/velocity/localsettings.py"
+			],
+			[
+				"alertsapphtml",
+				"velocity/apps/alertsapp/templates/alertsapp/kinesis/results-panel.html"
+			],
+			[
+				"cardsappvelosviews",
+				"velocity/apps/cardsapp/velos/views.py"
+			],
+			[
+				"velocitycard",
+				"velocity/velocity/nginx/sites/velocitycardmanagement"
+			],
+			[
+				"velocityfleet",
+				"velocity/velocity/nginx/sites/velocityfleet"
+			],
+			[
+				"app2css",
+				"velocity/velocity/static_global/newdesign/stylesheets/app2.css"
+			],
+			[
+				"veloscardlistable",
+				"velocity/apps/cardsapp/templates/cardsapp/velos/card_list_table.html"
+			],
+			[
+				"cardlisttablemul",
+				"velocity/apps/cardsapp/templates/cardsapp/fuels/card_list_table_multi_brand.html"
+			],
+			[
+				"veloscardna",
+				"velocity/apps/cardsapp/templates/cardsapp/velos/card_navigation.html"
+			],
+			[
+				"geoplussu",
+				"velocity/apps/reportsapp/templates/reportsapp/kinesis/geoplus/summary-panel.html"
+			],
+			[
+				"nginx",
+				"velocity/velocity/nginx/nginx.conf"
+			],
+			[
+				"passwordresetvelocity",
+				"velocity/apps/usersapp/templates/registration/password_reset_velocity_form.html"
+			],
+			[
+				"timesheetscontex",
+				"velocity/apps/reportsapp/kinesis/timesheets/context.py"
+			],
+			[
+				"timesheetsviews",
+				"velocity/apps/reportsapp/kinesis/timesheets/views.py"
+			],
+			[
+				"reportsvelosreportshtml",
+				"velocity/apps/reportsapp/templates/reportsapp/velos/reports.html"
+			],
+			[
+				"2015css",
+				"velocity/velocity/static_global/css/2015.css"
+			],
+			[
+				"2015.css",
+				"velocity/velocity/static/css/2015.css"
+			],
+			[
+				"velocitytablecss",
+				"velocity/velocity/static/css/tables/velocity-tables.css"
+			],
+			[
+				"fuelreports.html",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/reports.html"
+			],
+			[
+				"transactoinlistpanel",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/transaction-list-panel.html"
+			],
+			[
+				"transactionlisttable",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/transaction_list_table.html"
+			],
+			[
+				"reportsappsummary",
+				"velocity/apps/reportsapp/templates/reportsapp/fuels/report-summary.html"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+		"_vintageous_last_buffer_search": "Vin",
+		"_vintageous_last_buffer_search_command": "vi_slash",
+		"_vintageous_reset_during_init": true,
+		"vintage":
+		{
+			"_cmdline_cd": "/home/atanas/.config/sublime-text-3/Packages"
+		}
+	},
+	"show_minimap": false,
+	"show_open_files": true,
+	"show_tabs": true,
+	"side_bar_visible": false,
+	"side_bar_width": 271.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
