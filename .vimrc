@@ -1,6 +1,6 @@
 execute pathogen#infect()
-colorscheme solarized
-set background=dark
+set background=light
+colorscheme PaperColor
 " set tw=79
 set shell=bash
 set laststatus=2
@@ -30,9 +30,10 @@ set relativenumber
 set visualbell
 set ai
 set smarttab
-set cursorline
 set smartindent
 set scrolloff=17
+set cursorline
+hi CursorLine term=bold cterm=bold guibg=Grey40
 set sm
 set backspace=2
 set t_Co=256
@@ -65,7 +66,8 @@ let g:airline_right_alt_sep = '|'
 let g:airline#extensions#whitespace#enabled = 0
 let g:airline_left_sep=''
 let g:airline_right_sep=''
-let g:airline_theme='solarized'
+
+let g:enable_bold_font=1 
 
 let g:ctrlp_map = '<c-p>'
 let g:ctrlp_cmd = 'CtrlP'
@@ -96,7 +98,7 @@ let g:ctrlp_custom_ignore = {
 
 " make YCM compatible with UltiSnips (using supertab)
 let g:ycm_autoclose_preview_window_after_completion = 1
-let g:ycm_global_ycm_extra_conf = "~/.vim/.ycm_extra_conf.py"
+let g:ycm_global_ycm_extra_conf = "~/.ycm_extra_conf.py"
 let g:ycm_key_list_select_completion = ['<C-n>', '<Down>']
 let g:ycm_key_list_previous_completion = ['<C-p>', '<Up>']
 let g:SuperTabDefaultCompletionType = '<C-n>'
