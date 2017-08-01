@@ -55,3 +55,21 @@
 [submodule ".vim/bundle/YouCompleteMe"]
 	path = .vim/bundle/YouCompleteMe
 	url = https://github.com/Valloric/YouCompleteMe.git
+[submodule ".vim/bundle/auto-pairs"]
+	path = .vim/bundle/auto-pairs
+	url = git://github.com/jiangmiao/auto-pairs.git
+[submodule ".vim/bundle/papercolor-theme"]
+	path = .vim/bundle/papercolor-theme
+	url = https://github.com/NLKNguyen/papercolor-theme
+[submodule ".vim/bundle/vim-material-theme"]
+	path = .vim/bundle/vim-material-theme
+	url = https://github.com/jdkanani/vim-material-theme
+[submodule ".vim/bundle/cfparser.vim"]
+	path = .vim/bundle/cfparser.vim
+	url = https://github.com/gabrielsimoes/cfparser.vim
+[submodule ".vim/bundle/vim-colorschemes"]
+	path = .vim/bundle/vim-colorschemes
+	url = https://github.com/flazz/vim-colorschemes.git
+[submodule ".vim/bundle/vim-hybrid-material"]
+	path = .vim/bundle/vim-hybrid-material
+	url = https://github.com/kristijanhusak/vim-hybrid-material
